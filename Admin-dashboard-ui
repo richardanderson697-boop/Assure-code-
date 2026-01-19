@@ -1,0 +1,159 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Shield, Zap, Activity, Users, FileText, DollarSign, 
+  RefreshCw, CheckCircle, AlertTriangle, Menu, Settings, LogOut 
+} from 'lucide-react';
+
+const AdminDashboard = () => {
+  // --- REAL STATE ---
+  const [stats, setStats] = useState({ workspaces: 0, activeJobs: 0, unresolvedDrifts: 0 });
+  const [loading, setLoading] = useState(true);
+  const [testRunning, setTestRunning] = useState(false);
+  const [testResults, setTestResults] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // --- REAL API CALLS (Port 8080) ---
+  // Note: Using relative paths assumes your UI and API are served from the same domain
+  // If they are separate, use http://your-api-internal:8080
+  const fetchStats = async () => {
+    try {
+      const response = await fetch('/api/admin/stats'); // This hits your AdminService
+      const data = await response.json();
+      setStats(data);
+    } catch (err) {
+      console.error("Failed to fetch real stats from Port 8080");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+    const interval = setInterval(fetchStats, 10000); // Auto-refresh every 10s
+    return () => clearInterval(interval);
+  }, []);
+
+  const runManualSync = async () => {
+    setTestRunning(true);
+    try {
+      // This triggers the manualRetry implementation you shared
+      const response = await fetch('/api/admin/manual-sync', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const result = await response.json();
+      setTestResults(result);
+      fetchStats(); // Update stats after trigger
+    } catch (err) {
+      alert("Trigger failed. Check if API is running on 8080.");
+    } finally {
+      setTestRunning(false);
+    }
+  };
+
+  return (
+    <div className="flex h-screen bg-slate-50 font-sans">
+      {/* Sidebar */}
+      <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-slate-900 text-white transition-all duration-300 flex flex-col`}>
+        <div className="p-4 flex items-center justify-between border-b border-slate-800">
+          {sidebarOpen && <h1 className="text-lg font-bold tracking-tight text-blue-400">ASSURE CODE</h1>}
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 hover:bg-slate-800 rounded">
+            <Menu size={20} />
+          </button>
+        </div>
+        <nav className="flex-1 p-4 space-y-2">
+          <button className="w-full flex items-center gap-3 p-3 rounded bg-blue-600">
+            <Activity size={20} />
+            {sidebarOpen && <span>System Control</span>}
+          </button>
+        </nav>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 overflow-auto">
+        <header className="bg-white border-b px-8 py-4 flex items-center justify-between shadow-sm">
+          <h2 className="text-xl font-bold text-slate-800">Real-Time Compliance Monitor</h2>
+          <div className="flex items-center gap-2">
+            <div className={`w-3 h-3 rounded-full ${loading ? 'bg-yellow-500' : 'bg-green-500'} animate-pulse`}></div>
+            <span className="text-sm font-medium text-slate-500">{loading ? 'Syncing...' : 'Connected to 8080'}</span>
+          </div>
+        </header>
+
+        <main className="p-8">
+          {/* Top Row Stats - Driven by your AdminService */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-sm text-slate-500 uppercase font-bold tracking-wider">Active Workspaces</p>
+                  <p className="text-3xl font-black text-slate-900">{stats.workspaces}</p>
+                </div>
+                <Users className="text-blue-500 opacity-20" size={32} />
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-sm text-slate-500 uppercase font-bold tracking-wider">Queue Pressure</p>
+                  <p className="text-3xl font-black text-slate-900">{stats.activeJobs}</p>
+                </div>
+                <Zap className="text-yellow-500 opacity-20" size={32} />
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-sm text-slate-500 uppercase font-bold tracking-wider">Stale Drifts</p>
+                  <p className="text-3xl font-black text-red-600">{stats.unresolvedDrifts}</p>
+                </div>
+                <AlertTriangle className="text-red-500 opacity-20" size={32} />
+              </div>
+            </div>
+          </div>
+
+          {/* Action Center - The Force Multiplier */}
+          <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
+            <div className="p-6 bg-slate-900 text-white flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold">Manual Evaluation Trigger</h3>
+                <p className="text-slate-400 text-sm">Force AI to evaluate incoming laws against customer specs</p>
+              </div>
+              <button
+                onClick={runManualSync}
+                disabled={testRunning}
+                className="bg-blue-500 hover:bg-blue-400 text-white font-bold py-3 px-8 rounded-lg transition-all flex items-center gap-3 disabled:opacity-50"
+              >
+                {testRunning ? <RefreshCw className="animate-spin" size={20} /> : <Zap size={20} />}
+                {testRunning ? "Processing..." : "Trigger Manual Sync"}
+              </button>
+            </div>
+
+            <div className="p-8">
+              {testResults ? (
+                <div className="animate-in fade-in duration-500">
+                  <div className="flex items-center gap-3 text-green-600 mb-4">
+                    <CheckCircle size={24} />
+                    <span className="font-bold text-lg">Sync Complete</span>
+                  </div>
+                  <pre className="bg-slate-50 p-6 rounded-lg border border-slate-200 text-xs text-slate-700 overflow-auto max-h-60">
+                    {JSON.stringify(testResults, null, 2)}
+                  </pre>
+                  <p className="mt-4 text-sm text-slate-500 italic">Check Railway Logs for specific BullMQ worker output.</p>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <Shield size={64} className="mx-auto text-slate-200 mb-4" />
+                  <p className="text-slate-400 font-medium">Ready to evaluate compliance specs on Port 8080</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+};
+
+export default AdminDashboard;
